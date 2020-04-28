@@ -1,0 +1,5 @@
+.DS_Store
+.desktop.ini
+
+# No logisim-evolution.jar anymore
+*.jar
