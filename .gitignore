@@ -1,3 +1,15 @@
+.vscode/
+.DS_Store
+*.synctex.gz
+*.out
+*.log
+*.fls
+*.fdb_latexmk
+*.aux
+*.pseu
+*.bbl
+*.blg
+
 # Prerequisites
 *.d
 
