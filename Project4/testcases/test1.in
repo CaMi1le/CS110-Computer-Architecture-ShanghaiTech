@@ -1,0 +1,9 @@
+sleep 1 &
+sleep 1 &
+sleep 4 &
+sleep 1 &
+sleep 4 &
+sleep 1 &
+sleep 2
+kill %1 %2 %3
+jobs

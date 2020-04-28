@@ -1,0 +1,315 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+	<head>
+		<style>
+			body, table{font-family: Tahoma; font-size: 10pt}
+			table{border-collapse: collapse; border: 1px solid gray; border-width: 2px 1px 2px 1px;}
+			th{border: 1px solid gray; padding: 4px; background-color: #ddd;}
+			td{border: 1px solid gray; padding: 4px;}
+			tr:nth-child(2n){background-color: #f8f8f8;}
+			blockquote{margin-left: 1em; border-left: 6px solid #ddd; padding-left: 3px; color: #777}
+			pre{border: 2px solid #d6d6d6; padding: 0px; border-radius: 3px;}
+
+			.hljs {
+			  display: block;
+			  overflow-x: auto;
+			  padding: 0.5em;
+			  background: #23241f;
+			}
+
+			.hljs,
+			.hljs-tag,
+			.hljs-subst {
+			  color: #f8f8f2;
+			}
+
+			.hljs-strong,
+			.hljs-emphasis {
+			  color: #a8a8a2;
+			}
+
+			.hljs-bullet,
+			.hljs-quote,
+			.hljs-number,
+			.hljs-regexp,
+			.hljs-literal,
+			.hljs-link {
+			  color: #ae81ff;
+			}
+
+			.hljs-code,
+			.hljs-title,
+			.hljs-section,
+			.hljs-selector-class {
+			  color: #a6e22e;
+			}
+
+			.hljs-strong {
+			  font-weight: bold;
+			}
+
+			.hljs-emphasis {
+			  font-style: italic;
+			}
+
+			.hljs-keyword,
+			.hljs-selector-tag,
+			.hljs-name,
+			.hljs-attr {
+			  color: #f92672;
+			}
+
+			.hljs-symbol,
+			.hljs-attribute {
+			  color: #66d9ef;
+			}
+
+			.hljs-params,
+			.hljs-class .hljs-title {
+			  color: #f8f8f2;
+			}
+
+			.hljs-string,
+			.hljs-type,
+			.hljs-built_in,
+			.hljs-builtin-name,
+			.hljs-selector-id,
+			.hljs-selector-attr,
+			.hljs-selector-pseudo,
+			.hljs-addition,
+			.hljs-variable,
+			.hljs-template-variable {
+			  color: #e6db74;
+			}
+
+			.hljs-comment,
+			.hljs-deletion,
+			.hljs-meta {
+			  color: #75715e;
+			}
+
+		</style>
+	</head>
+	<body>
+		<div>
+			<h1 id="homework-11-rush-rust-shell-">Homework 11: Rush (Rust Shell)
+			</h1>
+			<h2 id="submission-instructions">Submission instructions
+			</h2>
+			<pre>
+<code class="hljs dockerfile">cargo new rush --bin
+cd rush
+<span class="hljs-comment"># Save your program in `src/main.rs`</span>
+git <span class="hljs-keyword">add</span><span class="bash"> Cargo.toml src/main.rs
+</span>git commit
+git remote <span class="hljs-keyword">add</span><span class="bash"> origin metastasis@gradebot.org:user/{username}/3/11
+</span>git push origin master
+</code></pre>
+			<h2 id="introduction">Introduction
+			</h2>
+			<p>A shell is a command interpreter for the system. On many Linux systems, <em>bash</em> is the default interactive shell, and <em>dash</em> is the default script interpreter. In this homework, you will implement a subset of <em>dash</em> called <em>rush</em>. You will learn system calls for process management and inter-process communications (IPC).
+			</p>
+			<p>You may find my <a href="http://shtech.org/course/si100c/17f/homework/11/rush">reference program</a> (SHA-256: 07dca0dd22b8a3913ffa197c3a90c7644ea49f3a2cad9dc66bf7675db5adde97) useful.
+			</p>
+			<h2 id="specification">Specification
+			</h2>
+			<h3 id="input-language">Input language
+			</h3>
+			<p>The shell reads commands from the standard input and execute them. We specify the input using Extended Backus-Naur Form (EBNF):
+			</p>
+			<pre>
+<code class="hljs ini"><span class="hljs-attr">Production</span>  = production_name <span class="hljs-string">"="</span> [ Expression ] <span class="hljs-string">"."</span> .
+<span class="hljs-attr">Expression</span>  = Alternative { <span class="hljs-string">"|"</span> Alternative } .
+<span class="hljs-attr">Alternative</span> = Term { Term } .
+<span class="hljs-attr">Term</span>        = production_name | token [ <span class="hljs-string">"â€¦"</span> token ] | Group | Option | Repetition .
+<span class="hljs-attr">Group</span>       = <span class="hljs-string">"("</span> Expression <span class="hljs-string">")"</span> .
+<span class="hljs-attr">Option</span>      = <span class="hljs-string">"["</span> Expression <span class="hljs-string">"]"</span> .
+<span class="hljs-attr">Repetition</span>  = <span class="hljs-string">"{"</span> Expression <span class="hljs-string">"}"</span> .
+</code></pre>
+			<p>Productions are expressions constructed from terms and the following operators, in increasing precedence:
+			</p>
+			<pre>
+<code class="hljs less">|   <span class="hljs-selector-tag">alternation</span>
+()  <span class="hljs-selector-tag">grouping</span>
+<span class="hljs-selector-attr">[]</span>  <span class="hljs-selector-tag">option</span> (<span class="hljs-number">0</span> or <span class="hljs-number">1</span> times)
+{}  <span class="hljs-selector-tag">repetition</span> (<span class="hljs-number">0</span> to n times)
+</code></pre>
+			<p>The input is encoded in Unicode. Each pair of adjacent tokens in the input are separated by one or more Unicode white space, except that the new line character need not be preceded or followed by white space. The following specification describes the input language.
+			</p>
+			<pre>
+<code class="hljs prolog"><span class="hljs-symbol">Input</span> = { <span class="hljs-symbol">CommandLine</span> } .
+<span class="hljs-symbol">CommandLine</span> = [ <span class="hljs-symbol">Command</span> [ <span class="hljs-string">"&lt;"</span> <span class="hljs-symbol">FileName</span> ] { <span class="hljs-string">"|"</span> <span class="hljs-symbol">Command</span> } [ <span class="hljs-string">"&gt;"</span> <span class="hljs-symbol">FileName</span> ] [ <span class="hljs-string">"&amp;"</span> ] ] new_line .
+<span class="hljs-symbol">Command</span> = ( <span class="hljs-symbol">BuiltInCommand</span> | <span class="hljs-symbol">ExecutableName</span> ) { <span class="hljs-symbol">Argument</span> } .
+</code></pre>
+			<h3 id="built-in-commands">Built-in commands
+			</h3>
+			<ul>
+				<li>
+					<p>
+						<code>
+cd</code> <em>directory</em> <br />Sets the current working directory to <em>directory</em>.
+					</p>
+				</li>
+				<li>
+					<p>
+						<code>
+exit</code> <br />Exits the shell.
+					</p>
+				</li>
+				<li>
+					<p>
+						<code>
+history</code> <br />Prints all the command lines that the user has entered in the chronological order. For each line
+					</p>
+					<ol>
+						<li>prints a counter that starts from 1, occupies 5 spaces, and is right-aligned;
+						</li>
+						<li>prints two spaces;
+						</li>
+						<li>prints the line;
+						</li>
+					</ol>
+					<p>For example, 
+					</p>
+					<pre>
+<code class="hljs stata">  1  <span class="hljs-keyword">ls</span>
+  2  <span class="hljs-keyword">ls</span> | <span class="hljs-keyword">cat</span>
+  3  <span class="hljs-keyword">cat</span> &lt; foo | <span class="hljs-keyword">cat</span> | <span class="hljs-keyword">cat</span> &gt; bar
+  4  <span class="hljs-keyword">sleep</span> 10 &amp;
+</code></pre>
+				</li>
+				<li>
+					<p>
+						<code>
+jobs</code> <br />Prints the live command lines in the chronological order. For each command line,
+prints its canonical representation as follows:
+					</p>
+					<ul>
+						<li>Prints all the tokens: built-in commands, executables, arguments, file names for I/O redirection, 
+							<code>
+&gt;</code>, 
+							<code>
+&lt;</code>, and 
+							<code>
+|</code>. Do <em>not</em> print 
+							<code>
+&amp;</code>.
+						</li>
+						<li>
+							<p>Separate every pair of adjacent tokens by one white space. Do not add white space at the beginning or end of the line.
+							</p>
+							<p>Do <em>not</em> print the dead command lines, whose commands have all finished.
+							</p>
+						</li>
+					</ul>
+				</li>
+				<li>
+					<p>
+						<code>
+kill</code> <em>pid</em> <br />Sends the signal 
+						<code>
+SIGTERM</code> to the process <em>pid</em>.
+					</p>
+				</li>
+				<li>
+					<p>
+						<code>
+pwd</code> <br />Prints the current working directory.
+					</p>
+				</li>
+			</ul>
+			<p>If a line contains a single built-in command, the command executes in the current process and ignores I/O direction.
+			</p>
+			<h3 id="external-commands">External commands
+			</h3>
+			<p>An external command is the name of an executable file. If the file name contains at least a slash (
+				<code>
+/</code>), executes the file. Otherwise, searches each entry in the 
+				<code>
+PATH</code> environment variable in turn for the command. 
+			</p>
+			<p>External commands execute in child processes.
+			</p>
+			<h3 id="i-o-redirection">I/O redirection
+			</h3>
+			<ul>
+				<li>
+					<code>
+&lt;</code> <em>filename</em>
+				</li>
+			</ul>
+			<p>Reads from <em>filename</em> instead of 
+				<code>
+stdio</code>.
+			</p>
+			<ul>
+				<li>
+					<code>
+&gt;</code> <em>filename</em>
+				</li>
+			</ul>
+			<p>Writes to <em>filename</em> instead of 
+				<code>
+stdout</code>.
+			</p>
+			<h3 id="pipes">Pipes
+			</h3>
+			<pre>
+<code class="hljs gherkin">command_1 |<span class="hljs-string"> command_2 </span>|<span class="hljs-string"> ... </span>|<span class="hljs-string"> command_n
+</span></code></pre>
+			<p>Runs each command in a child process, where the standard output from 
+				<code>
+command_i</code> becomes the standard input into 
+				<code>
+command_{i+1}</code>. Optionally, the first command may redirect its input from a file, and the last command its output to a file.
+			</p>
+			<p>Each command may be either external or built-in.
+			</p>
+			<h3 id="background-processes">Background processes
+			</h3>
+			<p>If a line has no trailing 
+				<code>
+&amp;</code>, the shell waits for all the commands on this line to finish before reading the next line. Otherwise, the commands on the line run in the &quot;background&quot;, and the shell reads the next line immediately.
+			</p>
+			<h3 id="error-handling">Error handling
+			</h3>
+			<p>We will test your shell with only valid input. We encourage, but not require, your program to handle error input.
+			</p>
+			<h3 id="output">Output
+			</h3>
+			<p>The shell prints a prompt 
+				<code>
+$</code> followed by a space before reading each line of input.
+			</p>
+			<h2 id="rust-hints">Rust hints
+			</h2>
+			<p>The <a href="https://github.com/rust-lang/libc">libc</a> crate provides native bindings to the types and functions used in system calls. If you use it, put the following in the 
+				<code>
+[dependencies]</code> section in your 
+				<code>
+Cargo.toml</code>:
+			</p>
+			<pre>
+<code class="hljs ini"><span class="hljs-attr">libc</span> = <span class="hljs-string">"0.2.31"</span>
+</code></pre>
+			<p><a href="https://doc.rust-lang.org/std/ffi/struct.CStr.html">std::ffi::CStr</a> and <a href="https://doc.rust-lang.org/std/ffi/struct.CString.html">std::ffi::CString</a> represent C strings and provide methods for converting to and from Rust strings.
+			</p>
+			<h2 id="academic-integrity">Academic integrity
+			</h2>
+			<p>This is an individual homework. While you may share ideas, algorithms, and test cases with others, under no circumstances may you exchange solution code with others. Examples of cheating include (but are not limited to):
+			</p>
+			<ul>
+				<li>Read or possess solution code written by other people, including people outside this course.
+				</li>
+				<li>Submit to the gradebot code written by other people or derived from the code written by other people.
+				</li>
+				<li>Allow other people to read or possess your solution code either intentionally or negligently, e.g., by posting your code on a web site or leaving the computer containing your code unattended and unlocked. You are responsible for exercising due diligence in safeguarding your code.
+				</li>
+			</ul>
+			<p>Last updated: 2017-09-29
+			</p>
+		</div>
+		<div>
+		</div>
+	</body>
+</html>

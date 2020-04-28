@@ -1,0 +1,5 @@
+.DS_Store
+shell
+*.out
+.vscode/
+*.tar
