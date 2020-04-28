@@ -1,0 +1,9 @@
+test/
+.vscode/
+.venv/
+.DS_Store
+benchmark
+benchmark_*
+kmeans
+kmeans_*
+*.tar
