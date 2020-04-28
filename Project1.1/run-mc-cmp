@@ -1,0 +1,22 @@
+./run-valgrind ./assembler input/$@.s out/$@.int out/$@.out -log log/$@.txt
+
+echo "============================================================"
+echo "pass one"
+echo "============================================================"
+diff out/ref/$@_ref.int out/$@.int
+echo ""
+
+echo "============================================================"
+echo "pass two"
+echo "============================================================"
+mkdir -p .temp/
+python3 display_bin.py < out/ref/$@_ref.out > .temp/f1.txt
+python3 display_bin.py < out/$@.out > .temp/f2.txt
+diff .temp/f1.txt .temp/f2.txt
+echo ""
+
+echo "============================================================"
+echo "log"
+echo "============================================================"
+diff log/ref/$@_ref.txt log/$@.txt
+echo ""
