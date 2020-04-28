@@ -1,0 +1,6 @@
+parsetools/
+string/
+symbol_list/
+test/
+.DS_Store
+*.tar
